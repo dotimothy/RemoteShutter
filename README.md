@@ -1,5 +1,5 @@
 # RemoteShutter
- A Microcontroller-based Wireless Remote Shutter for taking images with a variety of DSLRs! This is a fun exciting project to utilize the ESP32s I have lying around in my house and my passion for stable [Astrophotography](https://timothydo.me/astrophotography)
+ A Microcontroller-based Wireless Remote Shutter for taking images with a variety of DSLRs! This is a fun exciting project to utilize the ESP32s I have lying around in my house and my passion for stable [Astrophotography](https://timothydo.me/astrronomy/photography).
 ## Hardware Requirements
 Please have the following parts to create this project: 
 - 5V Power Supply (e.g. USB Power Bank, AC to DC USB Adapter, Etc.)
