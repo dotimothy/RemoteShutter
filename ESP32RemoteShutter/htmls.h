@@ -103,7 +103,7 @@ const char* index_html = R"(<!DOCTYPE html>
     let hostIP;
     let status;
     let httpCode = 0;
-    let captureTime = 300;
+    let captureTime = 350;
     let inProgress;
     let singleCapture;
     let intervalometer;

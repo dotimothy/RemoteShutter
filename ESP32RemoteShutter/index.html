@@ -260,7 +260,7 @@
                 console.log(logStr);
                 updateStatus(logStr);
             }
-        },300);
+        },captureTime);
         on.send();
     }
 
@@ -286,7 +286,7 @@
                     httpCode = 0;
                     clearProgess();
                     showControls();
-                },300);
+                },captureTime+50);
         }
         },0);
     }
@@ -318,7 +318,7 @@
                         showControls();
                         clearInterval(interval);
                     }
-                },300);
+                },captureTime+50);
                 ts = Date.now();
             }
             else {
@@ -347,7 +347,7 @@
             <div id="intervalometer" hidden>
                 <h2>🔄 Intervalometer </h2>
                 <label for="expsoureTime">Exposure Time (ms):</label>
-                <input type="number" id="exposureTime" name="exposureTime" min="0" max="30000" value="1000"></input>
+                <input type="number" id="exposureTime" name="exposureTime" min="0" max="captureTime00" value="1000"></input>
                 <br>
                 <label for="intervalTime">Interval Time (ms):</label>
                 <input type="number" id="intervalTime" name="intervalTime" min="0", value="1000"></input>
