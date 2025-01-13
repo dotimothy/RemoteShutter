@@ -185,7 +185,7 @@ const char* index_html = R"(<!DOCTYPE html>
 
         blocker.onclick = function () {
             blocker.hidden = true;
-            exitFullscreen();
+            document.exitFullscreen();
         }
 
         bulb.addEventListener('change', function() {
