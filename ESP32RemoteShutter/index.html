@@ -179,10 +179,12 @@
 
         sleepButton.addEventListener('click', () => {
             blocker.hidden = false;
+            document.body.requestFullscreen();
         });
 
         blocker.onclick = function () {
             blocker.hidden = true;
+            document.exitFullscreen();
         }
 
         bulb.addEventListener('change', function() {

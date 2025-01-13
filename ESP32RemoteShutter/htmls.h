@@ -180,10 +180,12 @@ const char* index_html = R"(<!DOCTYPE html>
 
         sleepButton.addEventListener('click', () => {
             blocker.hidden = false;
+            document.body.requestFullscreen();
         });
 
         blocker.onclick = function () {
             blocker.hidden = true;
+            exitFullscreen();
         }
 
         bulb.addEventListener('change', function() {
