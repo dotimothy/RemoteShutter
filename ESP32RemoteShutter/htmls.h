@@ -15,6 +15,7 @@ const char* index_html = R"(<!DOCTYPE html>
     * {
         color: white;
         font-family: Roboto;
+        z-index: 0;
     }
     body {
         background-color: black;
@@ -33,6 +34,11 @@ const char* index_html = R"(<!DOCTYPE html>
     input {
         color: black;
     }
+    input[type=checkbox] {
+        margin: 0.5em;
+        font-size: 2.5em;
+        transform: scale(2);
+    }
     button {
         opacity: 100%;
         transition: 0.125s;
@@ -48,19 +54,19 @@ const char* index_html = R"(<!DOCTYPE html>
     #controls, #results {
         background-color: rgb(50,50,50);
         position: absolute;
-        width: 80%;
-        padding: 1px;
+        width: 85%;
         padding-bottom: 1em;
         line-height: 1em;
     }
     #controls {
-        left: 10%;
+        left: 7.5%;
         top: 15%;
         height: 40%;
     }
     #results {
         bottom: 15%;
-        left: 10%;
+        left: 7.5%;
+        height: 25%;
     }
     #controls button, #results button {
         background-color: yellow;
@@ -74,9 +80,12 @@ const char* index_html = R"(<!DOCTYPE html>
         line-height: 1.25em;
         margin: 0.25em; 
     }
+    #results label, #results input {
+        padding: 0.25em;
+    }
     #status {
         padding: 0px;
-        line-height: 4em;
+        line-height: 3em;
     }
     footer {
         position: absolute; 
@@ -94,16 +103,26 @@ const char* index_html = R"(<!DOCTYPE html>
         line-height: 0.5em;
         margin: 0 auto;
     }
+    #blocker {
+        background-color: black;
+        z-index: 1;
+        position: fixed;
+        width: 100%;
+        height: 100%;
+    }
 </style>
 
 <script>
-    let ui;
-    let footer;
+    let welcome;
+    let switchStatus = false; //false: single capture, true: intervalometer
+    let blocker;
+    let bulb;
+    let bulbDiv;
     let title;
     let hostIP;
     let status;
     let httpCode = 0;
-    let captureTime = 350;
+    let captureTime = 300;
     let inProgress;
     let singleCapture;
     let intervalometer;
@@ -116,14 +135,13 @@ const char* index_html = R"(<!DOCTYPE html>
     let intervalTimeInput;
     let numImagesInput;
     let switchButton;
-    let fullscreenButton;
-
-    let switchStatus = false; //false: single capture, true: intervalometer
+    let sleepButton;
 
     window.onload = function() {
         // Setting Variables
-        ui = document.getElementById('ui');
-        footer = document.querySelector('footer');
+        bulb = document.getElementById('bulb');
+        bulbDiv = document.getElementById('bulbDiv');
+        blocker = document.getElementById('blocker'); 
         title = document.getElementById('title');
         status = document.getElementById('status');
         inProgress = document.getElementById('inProgress');
@@ -136,7 +154,10 @@ const char* index_html = R"(<!DOCTYPE html>
         singleButton = document.getElementById('singleButton');
         intervalButton = document.getElementById('intervalButton');
         switchButton = document.getElementById('switchButton');
-        fullscreenButton = document.getElementById('fullscreenButton');
+        sleepButton = document.getElementById('sleepButton');
+
+        // Preload Previous Session Variables
+        loadSession();
 
         //Get Hostname
         getHostname();
@@ -154,28 +175,70 @@ const char* index_html = R"(<!DOCTYPE html>
         })
 
         switchButton.addEventListener('click', () => {
-            switchModes();
+            switchModes(switchStatus);
         });
 
-        fullscreenButton.addEventListener('click', () => {
-            toggleFullscreen();
+        sleepButton.addEventListener('click', () => {
+            blocker.hidden = false;
         });
+
+        blocker.onclick = function () {
+            blocker.hidden = true;
+        }
+
+        bulb.addEventListener('change', function() {
+            sessionStorage['bulb'] = bulb.checked;
+        });
+
+        timer.addEventListener('change', function() {
+            sessionStorage['timer'] = timer.value;
+        });
+
+        exposureTimeInput.addEventListener('change', function() {
+            sessionStorage['exposureTime'] = exposureTimeInput.value;
+        });
+
+        intervalTimeInput.addEventListener('change', function() {
+            sessionStorage['intervalTime'] = intervalTimeInput.value;
+        });
+
+        numImagesInput.addEventListener('change', function() {
+            sessionStorage['numImages'] = numImagesInput.value;
+        });
+
 
         // Finished Initializing Remote Shutter Web App
         updateStatus('Initialized Remote Shutter');
 
         // Show the UI
-        alert('Welcome to the ESP32 Remote Shutter!');
-        ui.hidden = false;
-        footer.hidden = false;
+        if(!welcome) {
+            alert('Welcome to the ESP32 Remote Shutter! Capture with your DSLR Wirelessly in Two Modes: Single Capture or Intervalometer!!!\n\nSleep Mode for Power Saving by turning the screen completely off. Tap anywhere on screen to awaken!');
+            sessionStorage['welcome'] = true;
+        }
+        blocker.hidden = true; 
     }
 
-    function toggleFullscreen() {
-        if(document.fullscreenElement) {
-            document.exitFullscreen()
-        } else {
-            document.body.requestFullscreen();
+    function loadSession() {
+        welcome = sessionStorage.getItem('welcome') !== null && sessionStorage.getItem('welcome') == 'true';
+        if(sessionStorage.getItem('switchStatus') !== null && sessionStorage.getItem('switchStatus') == 'true') { // Shutter Mode
+            switchModes(switchStatus);
         }
+        bulb.checked = sessionStorage.getItem('bulb') !== null && sessionStorage.getItem('bulb') == 'true'; //Auto Check Bulb from Memory
+        if(sessionStorage.getItem('timer') !== null) { //Remember Timer Value
+            timer.value = Number(sessionStorage.getItem('timer'));
+        }
+        if(sessionStorage.getItem('exposureTime') !== null) {
+            exposureTimeInput.value = Number(sessionStorage.getItem('exposureTime'));
+        }
+        if(sessionStorage.getItem('intervalTime') !== null) {
+            intervalTimeInput.value = Number(sessionStorage.getItem('intervalTime'));
+        }
+        if(sessionStorage.getItem('numImages') !== null) {
+            numImagesInput.value = Number(sessionStorage.getItem('numImages'));
+        }
+
+        console.log(`Loaded Session:`);
+        console.log(sessionStorage);
     }
 
     function getHostname() {
@@ -187,8 +250,8 @@ const char* index_html = R"(<!DOCTYPE html>
         singleButton.hidden = true;
         intervalometer.hidden = true;
         intervalButton.hidden = true;
-        fullscreenButton.hidden = true;
         switchButton.hidden = true;
+        bulbDiv.hidden = true;
     }
 
     function showControls () {
@@ -198,7 +261,7 @@ const char* index_html = R"(<!DOCTYPE html>
         intervalButton.hidden = !switchStatus;
         controls.hidden = false;
         switchButton.hidden = false;
-        fullscreenButton.hidden = false;
+        bulbDiv.hidden = false; 
     }
 
     function switchModes() {
@@ -207,12 +270,13 @@ const char* index_html = R"(<!DOCTYPE html>
         intervalometer.hidden = switchStatus;
         intervalButton.hidden = switchStatus;
         switchStatus = !switchStatus;
+        sessionStorage['switchStatus'] = switchStatus;
         let logString = `Set Remote Shutter to ${switchStatus ? "Intervalometer" : "Single Capture"} Mode`;
         updateStatus(logString);
     }
 
     function fillProgess() {
-        inProgress.innerHTML = '<h2>Processing Capture with the Following Settings:</h2> <br>';
+        inProgress.innerHTML = '<h2>Capture Settings:</h2> <br>';
         let mode = switchStatus ? "Intervalometer" : "Single Capture";
         inProgress.innerHTML += `<h3>Capture Mode: ${mode}</h3> <br>`;
         if(switchStatus) { // Intervalometer
@@ -261,35 +325,53 @@ const char* index_html = R"(<!DOCTYPE html>
                 console.log(logStr);
                 updateStatus(logStr);
             }
-        },300);
+        },captureTime);
         on.send();
     }
 
     function single() {
         hideControls();
         fillProgess();
-        let delay = Number(timer.value);
-        let ts = Date.now();
-        let delta = 0;
-        interval = setInterval(function() {
-            delta = delay - (Date.now() - ts); // in ms
-            let deltaStr = ((delta - delta % 100) / 1000.0).toFixed(1);
-            let logStr = `Single Capture in ${deltaStr} s`; 
+        if(bulb.checked) {
+            let logStr = `Processing Single Capture in Bulb Mode...`; 
+            let prevCaptureTime = captureTime;
+            captureTime = Math.max(timer.value,captureTime); 
             updateStatus(logStr);
-            if(delta <= 0) {
-                let logStr = `Processing Single Capture...`; 
+            clearInterval(interval);
+            capture(); 
+            setTimeout(function () {
+                logStr = `${httpCode} - Single Capture ${httpCode== 200 ? "Success!" : "Failed."}`;
                 updateStatus(logStr);
-                clearInterval(interval);
-                capture(); 
-                setTimeout(function () {
-                    logStr = `${httpCode} - Single Capture ${httpCode== 200 ? "Success!" : "Failed."}`;
-                    updateStatus(logStr);
-                    httpCode = 0;
-                    clearProgess();
-                    showControls();
-                },300);
+                httpCode = 0;
+                clearProgess();
+                showControls();
+            },captureTime+50);
+            captureTime = prevCaptureTime;
         }
-        },0);
+        else {
+            let delay = Number(timer.value);
+            let ts = Date.now();
+            let delta = 0;
+            interval = setInterval(function() {
+                delta = delay - (Date.now() - ts); // in ms
+                let deltaStr = ((delta - delta % 100) / 1000.0).toFixed(1);
+                let logStr = `Single Capture in ${deltaStr} s`; 
+                updateStatus(logStr);
+                if(delta <= 0) {
+                    let logStr = `Processing Single Capture...`; 
+                    updateStatus(logStr);
+                    clearInterval(interval);
+                    capture(); 
+                    setTimeout(function () {
+                        logStr = `${httpCode} - Single Capture ${httpCode== 200 ? "Success!" : "Failed."}`;
+                        updateStatus(logStr);
+                        httpCode = 0;
+                        clearProgess();
+                        showControls();
+                    },captureTime+50);
+            }
+            },0);
+        }
     }
 
     function multiple() {
@@ -300,34 +382,56 @@ const char* index_html = R"(<!DOCTYPE html>
         let ts = Date.now();
         let delta = 0;
         let counter = 0;
+        let logStr = '';
         hideControls();
         fillProgess();
-        interval = setInterval(function() {
-            let delay = period;
-            let logStr = '';
-            delta = delay - (Date.now() - ts); // in ms
-            console.log(delay);
-            if(delta <= 0) {
-                logStr = `Processing Multi Capture (${counter+1}/${numImages})...`;
-                capture(false);
-                counter++;
-                setTimeout(function() {
-                    if(counter == numImages || httpCode != 200) {
-                        logStr = `${httpCode} - (${counter}/${numImages}) Multi Capture ${httpCode == 200 ? "Success!" : "Failed."}`;
-                        updateStatus(logStr);
-                        clearProgess();
-                        showControls();
-                        clearInterval(interval);
-                    }
-                },300);
-                ts = Date.now();
-            }
-            else {
-                let deltaStr = ((delta - delta % 100) / 1000.0).toFixed(1);
-                logStr = `Multi Capture (${counter}/${numImages}) in ${deltaStr} s`;
+        if(bulb.checked) {
+            let prevCaptureTime = captureTime;
+            captureTime = period;
+            interval = setInterval(function() {
+                logStr = `Processing Multi Capture (${counter+1}/${numImages}) in Bulb Mode...`;
                 updateStatus(logStr);
-            }
-        },0);
+                capture(false);
+                if(counter == numImages || httpCode != 200) {
+                    logStr = `${httpCode} - (${counter}/${numImages}) Multi Capture ${httpCode == 200 ? "Success!" : "Failed."}`;
+                    updateStatus(logStr);
+                    clearProgess();
+                    showControls();
+                    clearInterval(interval);
+                }
+                if(httpCode == 200) {
+                    counter++;
+                }
+            },captureTime+50);
+            captureTime = prevCaptureTime;
+        }
+        else {
+            interval = setInterval(function() {
+                let delay = period;
+                delta = delay - (Date.now() - ts); // in ms
+                if(delta <= 0) {
+                    logStr = `Processing Multi Capture (${counter+1}/${numImages})...`;
+                    updateStatus(logStr);
+                    capture(false);
+                    counter++;
+                    setTimeout(function() {
+                        if(counter == numImages || httpCode != 200) {
+                            logStr = `${httpCode} - (${counter}/${numImages}) Multi Capture ${httpCode == 200 ? "Success!" : "Failed."}`;
+                            updateStatus(logStr);
+                            clearProgess();
+                            showControls();
+                            clearInterval(interval);
+                        }
+                    },captureTime+50);
+                    ts = Date.now();
+                }
+                else {
+                    let deltaStr = ((delta - delta % 100) / 1000.0).toFixed(1);
+                    logStr = `Multi Capture (${Math.min(counter+1,numImages)}/${numImages}) in ${deltaStr} s`;
+                    updateStatus(logStr);
+                }
+            },0);
+        }
     }
 
     function updateStatus(statusString) {
@@ -336,39 +440,40 @@ const char* index_html = R"(<!DOCTYPE html>
 </script>
 
 <body>
-    <div id="ui" hidden>
-        <h1 id="title"></h1>
-        <div id="controls">
-            <div id="singleCapture">
-                <h2>1️⃣ Single Capture Mode </h2>
-                <label for="timer">Timer (ms):</label>
-                <input type="number" id="timer" name="timer" min="0"value="0"></input>
-                <br>
-            </div>
-            <div id="intervalometer" hidden>
-                <h2>🔄 Intervalometer </h2>
-                <label for="expsoureTime">Exposure Time (ms):</label>
-                <input type="number" id="exposureTime" name="exposureTime" min="0" max="30000" value="1000"></input>
-                <br>
-                <label for="intervalTime">Interval Time (ms):</label>
-                <input type="number" id="intervalTime" name="intervalTime" min="0", value="1000"></input>
-                <br>
-                <label for="numImages">Number of Images:</label>
-                <input type="number" id="numImages" name="numImages" min="1",  value="1"></input>
-            </div>
-            <div id="inProgress"></div>
+    <div id="blocker"></div>
+    <h1 id="title"></h1>
+    <div id="controls">
+        <div id="singleCapture">
+            <h2>1️⃣ Single Capture Mode </h2>
+            <label for="timer">Timer (ms):</label>
+            <input type="number" id="timer" name="timer" min="0"value="0"></input>
+            <br>
         </div>
-        <div id="results">
-            <div id="status"></div>
-            <button id="singleButton">Capture</button>
-            <button id="intervalButton" hidden>Capture</button>
-            <button id="fullscreenButton">Fullscreen</button>
-            <button id="switchButton">Change Mode</button>
-            
-            <h2>
+        <div id="intervalometer" hidden>
+            <h2>🔄 Intervalometer </h2>
+            <label for="expsoureTime">Exposure Time (ms):</label>
+            <input type="number" id="exposureTime" name="exposureTime" min="0" max="captureTime00" value="1000"></input>
+            <br>
+            <label for="intervalTime">Interval Time (ms):</label>
+            <input type="number" id="intervalTime" name="intervalTime" min="0", value="1000"></input>
+            <br>
+            <label for="numImages">Number of Images:</label>
+            <input type="number" id="numImages" name="numImages" min="1",  value="1"></input>
+        </div>
+        <div id="inProgress"></div>
+    </div>
+    <div id="results">
+        <div id="status"></div>
+        <button id="singleButton">Capture</button>
+        <button id="intervalButton" hidden>Capture</button>
+        <button id="switchButton">Switch</button>
+        <button id="sleepButton">Sleep</button>     
+        <br>
+        <div id="bulbDiv">
+            <label for="bulb">Bulb Mode:</label>
+            <input type="checkbox" id="bulb"></input>
         </div>
     </div>
-
 </body>
 
 <footer hidden>
